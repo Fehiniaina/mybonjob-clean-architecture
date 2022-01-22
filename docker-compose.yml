@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: docker/php/Dockerfile
     depends_on:
-      - postgres
+      - database
 
   symfony:
     build:
@@ -16,12 +16,12 @@ services:
       - php
     restart: always
 
-  postgres:
+  database:
     # In production, you may want to use a managed database service
-    image: postgres:9.6-alpine
+    image: mysql:5.7
 
   adminer:
     image: adminer
     depends_on:
-      - postgres
+      - database
     restart: always

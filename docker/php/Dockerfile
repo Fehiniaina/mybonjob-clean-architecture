@@ -1,78 +1,57 @@
-FROM composer:1.8
-FROM php:8.0.5-fpm-alpine
+FROM alpine:3.15
 
-# Install modules
-RUN buildDeps="libpq-dev libzip-dev libicu-dev libfreetype6-dev libmagickwand-6.q16-dev" && \
-    apt-get update && \
-    apt-get install -y $buildDeps --no-install-recommends && \
-    ln -s /usr/lib/x86_64-linux-gnu/ImageMagick-6.8.9/bin-Q16/MagickWand-config /usr/bin && \
-    pecl install imagick && \
-    echo "extension=imagick.so" > /usr/local/etc/php/conf.d/ext-imagick.ini && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    docker-php-ext-install \
-        opcache \
-        pdo \
-        pdo_pgsql \
-        pgsql \
-        sockets \
-        intl \
-        zip \
-        && pecl install apcu \
-        && docker-php-ext-enable apcu
+ARG PHP_VERSION="8.0.14-r0"
 
-# Install gd
-RUN apt-get update \
-&& apt-get install -y libwebp-dev libjpeg62-turbo-dev libpng-dev libxpm-dev \
-    libfreetype6-dev
+# https://github.com/wp-cli/wp-cli/issues/3840
+ENV PAGER="more"
 
-RUN docker-php-ext-configure gd --with-gd --with-webp-dir --with-jpeg-dir \
-    --with-png-dir --with-zlib-dir --with-xpm-dir --with-freetype-dir
+# Install packages and remove default server definition
+RUN apk --no-cache add php8=${PHP_VERSION} \
+    php8-ctype \
+    php8-curl \
+    php8-dom \
+    php8-exif \
+    php8-fileinfo \
+    php8-fpm \
+    php8-gd \
+    php8-iconv \
+    php8-intl \
+    php8-mbstring \
+    php8-mysqli \
+    php8-opcache \
+    php8-openssl \
+    php8-pecl-imagick \
+    php8-pecl-redis \
+    php8-phar \
+    php8-session \
+    php8-simplexml \
+    php8-soap \
+    php8-xml \
+    php8-xmlreader \
+    php8-zip \
+    php8-zlib \
+    php8-pdo \
+    php8-xmlwriter \
+    php8-tokenizer \
+    php8-pdo_mysql \
+    nginx supervisor curl tzdata htop mysql-client dcron
 
-RUN docker-php-ext-install gd
+# Symlink php8 => php
+RUN ln -s /usr/bin/php8 /usr/bin/php
 
-# Install nodejs
-RUN apt-get update && \
-    apt-get install -y gnupg && \
-    apt-get install -y gnupg2 && \
-    curl -sL https://deb.nodesource.com/setup_11.x | bash - && \
-    apt-get install -y nodejs
+# Install PHP tools
+RUN curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && chmod +x wp-cli.phar && mv wp-cli.phar /usr/local/bin/wp
+#RUN php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" && php composer-setup.php --install-dir=/usr/local/bin --filename=composer
 
-# Install yarn
-RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - && \
-    echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list && \
-    apt-get update && \
-    apt-get install --no-install-recommends yarn
+# Configure PHP-FPM
+COPY docker/php/conf/fpm-pool.conf /etc/php8/php-fpm.d/www.conf
+COPY docker/php/conf/php.ini /etc/php8/conf.d/custom.ini
 
-# Install xdebug - no stable version for 7.3 yet
-RUN pecl install xdebug-2.7.0beta1 \
-    && docker-php-ext-enable xdebug \
-    && echo "error_reporting = E_ALL" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini \
-    && echo "display_startup_errors = On" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini \
-    && echo "display_errors = On" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini \
-    && echo "xdebug.remote_enable=1" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini \
-    && echo "xdebug.remote_connect_back=1" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini \
-    && echo "xdebug.remote_port=9000" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini \
-    && echo "xdebug.profiler_enable=1" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini \
-    && echo "xdebug.profiler_output_dir=/tmp/snapshots" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini \
-    && echo "xdebug.profiler_enable_trigger=1" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini \
-    && echo "xdebug.remote_host = localhost"
 
-# Install gnumeric for ssconvert to convert xls/xlsx to csv
-RUN apt-get install -y --no-install-recommends gnumeric
-
-# Add aliases for xdebug control
-RUN echo 'alias xoff="mv /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini.off && kill -USR2 1"' >> ~/.bashrc
-RUN echo 'alias xon="mv /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini.off /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini && kill -USR2 1"' >> ~/.bashrc
-
-RUN  apt-get install -y nano less
-
-COPY docker/php/composer-1.8 /usr/bin/composer
+#COPY docker/php/composer-1.8 /usr/bin/composer
 #COPY --from=0 /usr/bin/composer /usr/bin/composer
-COPY docker/php/conf/php.ini /usr/local/etc/php/php.ini
 COPY docker/php/docker-entrypoint.sh /usr/local/bin/docker-entrypoint
 RUN chmod +x /usr/local/bin/docker-entrypoint
-RUN chmod +x /usr/local/bin/apcu_clear_cache
 
 WORKDIR /var/www/symfony
 ENTRYPOINT ["docker-entrypoint"]

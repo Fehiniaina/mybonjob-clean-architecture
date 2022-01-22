@@ -2,55 +2,38 @@ version: '3.5'
 
 services:
   php:
-    container_name: mybonjob_local_php
-    networks:
-    - mybonjob_local
-    environment:
-    - WITH_XDEBUG=true
+    container_name: mybonjob_php
     volumes:
-    - ./symfony:/var/www/symfony:rw,cached
+      - ./symfony:/var/www/symfony:rw,cached
 
   symfony:
     container_name: mybonjob_local_symfony
-    networks:
-    - mybonjob_local
     ports:
-    - "8101:443"
+      - "8101:443"
     volumes:
-    - ./symfony/public:/var/www/symfony/public:ro
+      - ./symfony/public:/var/www/symfony/public:ro
 
-  postgres:
-    container_name: mybonjob_local_postgres
-    networks:
-    - mybonjob_local
+  database:
+    container_name: mybonjob_mysql
     environment:
-    - POSTGRES_DB=onerba
-    - POSTGRES_USER=onerba
-    - POSTGRES_PASSWORD=zn2vh49sgq4ni76564s4
-    - PGDATA=/var/lib/postgresql/data/db-files/
-    ports:
-    - "5432:5432"
-    volumes:
-    - ./postgres-data:/var/lib/postgresql/data
+      - MYSQL_ROOT_HOST=%
+      - MYSQL_DATABASE=mybonjob
+      - MYSQL_USER=mybonjob
+      - MYSQL_PASSWORD=X0145Hmybonjob
+      - MYSQL_ROOT_PASSWORD=R0145mybonjob
+      - TZ=Europe/Paris
+    #volumes:
+    #  - ./mysql-data/data:/var/lib/mysql:rw
+    #  - ./mysql-data/dumps:/var/dumps:rw
+    #  - ./mysql-data/sessions/mysql:/root:rw
+    expose:
+      - "3306"
 
   adminer:
-    container_name: mybonjob_local_adminer
-    networks:
-    - mybonjob_local
+    container_name: mybonjob_adminer
     ports:
-    - 2021:8080
-
-  mailcatcher:
-    build:
-      context: ./symfony
-      dockerfile: docker/mailcatcher/Dockerfile
-    container_name: mybonjob_local_mailcatcher
-    networks:
-    - mybonjob_local
-    ports:
-    - 1026:1026
-    - 1081:1081
+      - 2021:8080
 
 networks:
-  mybonjob_local:
-    name: mybonjob_local
+  default: # this network
+    driver: bridge
